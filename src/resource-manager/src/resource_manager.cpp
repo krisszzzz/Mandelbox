@@ -74,32 +74,31 @@ static int find_exe_file_name_len(const char* exec_path) {
         return backslash_position;
 }
 
-int init_resource_manager(resource_manager* res_manager, const char* exec_path)
+int init_resource_manager(resource_manager* res_manager, const char* work_dir)
 {
         if (res_manager == nullptr) {
                 ErrorPrint(RED "ERROR: " END "resource_manager initialization error. Nullptr resource_manager\n");
                 return NULLPTR;
         }
 
-        if (exec_path == nullptr) {
+        if (work_dir == nullptr) {
                 ErrorPrint(RED "ERROR: " END "Exec_path is nullptr\n");
                 return NULLPTR;
         }
-        int exec_path_len        = strlen(exec_path) - find_exe_file_name_len(exec_path);
 
         char* shader_names_chunk = (char*)calloc(MIN_CHUNK_SIZE, sizeof(char));
-        char* execute_path       = (char*)calloc(exec_path_len,
+        char* to_save_work_dir   = (char*)calloc(strlen(work_dir),
                                                  sizeof(char));
 
-        if(shader_names_chunk == nullptr || execute_path == nullptr) {
+        if(shader_names_chunk == nullptr || to_save_work_dir == nullptr) {
                 ErrorPrint(RED "ERROR: " END "Memory allocation error\n");
                 return RME_MALLOC_ERROR;
         }
 
-        strncpy(execute_path, exec_path, exec_path_len);
+        strcpy(to_save_work_dir, work_dir);
 
         res_manager->shader_names_chunk  = shader_names_chunk;
-        res_manager->execute_path        = execute_path;
+        res_manager->work_dir            = to_save_work_dir;
         res_manager->is_initialized      = 1;
         res_manager->shader_names_offset = 0;
         res_manager->shader_names_size   = MIN_CHUNK_SIZE;
@@ -178,17 +177,29 @@ char* file_to_buffer(FILE* source, int* buffer_size)
 	return buffer;
 }
 
-char* load_file_source(const char *const src_file_path)
+#define MAX_PATH_LEN 512
+
+char* load_file_source(const char *const relative_path)
 {
-        if (!src_file_path) {
+        static char path[MAX_PATH_LEN] = {};
+
+        if (!relative_path) {
                 ErrorPrint("src_file_path is nullptr.\n");
                 return nullptr;
         }
 
-        FILE *source_file = fopen(src_file_path, "r");
+        int work_dir_len = strlen(binded_manager.work_dir);
+        strcpy(path, binded_manager.work_dir);
+        
+        path[work_dir_len] = '/';
+        
+        strcpy(&path[work_dir_len + 1],
+               relative_path);
+        
+        FILE *source_file = fopen(path, "r");
 
         if (!source_file) {
-                ErrorPrint(RED "ERROR: " END " cannot open file. File name : %s\n", src_file_path);
+                ErrorPrint(RED "ERROR: " END " cannot open file. File name : %s\n", relative_path);
                 return nullptr;
         }
 
@@ -291,8 +302,10 @@ static int shader_log(shader* shaders, int iter_count)
 
 
                 printf(BLUE "%-25s " END, shader_type_str_by_iter_count(iter_count));
+                //                printf("\nSTATUS: %b\n", shaders->status);
 
-                if (shaders->status != (SHADERS_COMPILED & SHADERS_LINKED)) {
+                if (!check_shader_status(shaders->status, SHADERS_COMPILED) ||
+                    !check_shader_status(shaders->status, SHADERS_LINKED)) {
                         printf(RED "*");
                 } else {
                         printf(GREEN);
@@ -361,12 +374,12 @@ int resource_manager_shader_log()
 
         printf(RED "RESOURCE MANAGER LOG:\n"
                    "Resource manager info: \n"
-                   "execute_path = " GREEN " %s\n" RED
+                   "work_dir = " GREEN " %s\n" RED
                    "shader_names_offset = %d\n"
                    "shader_names_size = %d\n"
                    "shader_program_count = %d\n"
                    "shader_program_size = %d\n" END,
-               binded_manager.execute_path,
+               binded_manager.work_dir,
                binded_manager.shader_names_offset,
                binded_manager.shader_names_size,
                binded_manager.shader_program_count,
@@ -503,6 +516,35 @@ static void shader_compile_status(shader_program* prog, int iter_count)
         binded_manager.status = save_bit(binded_manager.status, status) \
         } while(0)
 
+int shader_prog_mem_manage()
+{
+        if (binded_manager.shader_program_size == 0) {
+                binded_manager.programs = (shader_program*)calloc(MIN_PROGRAM_COUNT,
+                                                                  sizeof(shader_program));
+                binded_manager.shader_program_size = MIN_PROGRAM_COUNT;
+                if (binded_manager.programs == nullptr) {
+                        ErrorPrint(RED "Memory allocation for programs was errored" END);
+                        // Set resource manager status
+                        return  RME_MALLOC_ERROR;
+                }
+
+        }
+
+        if (binded_manager.shader_program_count >= binded_manager.shader_program_size - 1) {
+                binded_manager.shader_program_size *= 2;
+                binded_manager.programs = (shader_program*)realloc(binded_manager.programs,
+                                                                   sizeof(shader_program) *
+                                                                   binded_manager.shader_program_size);
+
+                if (binded_manager.programs == nullptr) {
+                        ErrorPrint(RED "Memory allocation for programs was errored" END);
+                        // Set resource manager status
+                        return  RME_MALLOC_ERROR;
+                }
+        }
+
+}
+
 int create_shader_prog(const char* const shader_prog_name, const char* const vert_s,
                        const char* const frag_s,           const char* const geom_s,
                        const char* const tess_ctl_s,       const char* const tess_eval_s,
@@ -522,29 +564,7 @@ int create_shader_prog(const char* const shader_prog_name, const char* const ver
                            "Nullptr shader ");
         }
 
-        if (binded_manager.shader_program_size == 0) {
-                binded_manager.programs = (shader_program*)calloc(MIN_PROGRAM_COUNT,
-                                                                  sizeof(shader_program));
-                binded_manager.shader_program_size = MIN_PROGRAM_COUNT;
-                if (binded_manager.programs == nullptr) {
-                        ErrorPrint(RED "Memory allocation for programs was errored" END);
-                        // Set resource manager status
-                        return  RME_MALLOC_ERROR;
-                }
-        }
-
-        if (binded_manager.shader_program_count >= binded_manager.shader_program_size - 1) {
-                binded_manager.shader_program_size *= 2;
-                binded_manager.programs = (shader_program*)realloc(binded_manager.programs,
-                                                                   sizeof(shader_program) *
-                                                                   binded_manager.shader_program_size);
-
-                if (binded_manager.programs == nullptr) {
-                        ErrorPrint(RED "Memory allocation for programs was errored" END);
-                        // Set resource manager status
-                        return  RME_MALLOC_ERROR;
-                }
-        }
+        shader_prog_mem_manage();
 
         const char* const shaders_path[MAX_SHADER_TYPES] =  {vert_s,     frag_s,      geom_s,
                                                              tess_ctl_s, tess_eval_s, comp_s};
@@ -636,7 +656,7 @@ int destroy_resource_manager()
                 return 0;
         }
 
-        free(binded_manager.execute_path);
+        free(binded_manager.work_dir);
         free(binded_manager.shader_names_chunk);
 
         binded_manager.is_initialized       = 0;

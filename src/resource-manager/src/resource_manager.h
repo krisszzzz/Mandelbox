@@ -1,3 +1,8 @@
+/** @file resource_manager.h
+ *  @brief something
+ * 
+ */
+
 #ifndef SHADER_HANDLER_H_
 #define SHADER_HANDLER_H_
 
@@ -6,42 +11,61 @@
 #include <murmurhash.h>
 #include <stdio.h>
 
-//The workhorse here is PP_256TH_ARG. It returns its 128th argument, by ignoring the first 127 arguments (named arbitrarily _1 _2 _3 etc.), naming the 128th argument N, and defining the result of the macro to be N.
-
-//PP_NARG invokes PP_128TH_ARG with __VA_ARGS__ concatenated with PP_RSEQ_N, a reversed sequence of numbers counting from 127 down to 0.
-
-//If you provide no arguments, the 128th value of PP_RSEQ_N is 0. If you pass one argument to PP_NARG, then that argument will be passed to PP_128TH_ARG as _1; _2 will be 127, and the 128th argument to PP_128TH_ARG will be 1. Thus, each argument in __VA_ARGS__ bumps PP_RSEQ_N over by one, leaving the correct answer in the 128th slot.
-
-
 const int MAX_SHADER_TYPES = 6;
+
+/** Structure to simplify working with shaders. */
 
 struct shader
 {
-        char*     shader_path;
-        hash_t    shader_hash;
-        GLenum    shader_type;
-        GLuint    shader_id;
+        char*     shader_path; /**< path to the shader source file */
+        hash_t    shader_hash; /**< hash of current shader. Used to search shader
+                                *   in shader_program.  
+                                */
+        GLenum    shader_type; /**< One of this shader type: GL_VERTEX_SHADER,
+                                *   GL_FRAGMENT_SHADER, GL_GEOMENTRY_SHADER,
+                                *   GL_TESS_CONTROL_SHADER, GL_TESS_EVALUATION_SHADER.
+                                *   For more see GLFW documentation.
+                                */
+        GLuint    shader_id;   /**< shader_id is return value of glCreateShader() function.
+                                *   For more see GLFW documentation.
+                                */
 
-        long long status;
+        long long status;      /**< Flag used to check the shader status, used in printing debug info
+                                */
 
 };
+
+
+/** Structure that contain array of shaders (shader structure objects), and info from GLFW functions */
 
 struct shader_program
 {
-        shader      shaders[MAX_SHADER_TYPES];
-        hash_t      shader_prog_hash;
-        GLuint      shader_prog_id;
-
-        long long   status;
-
+        shader      shaders[MAX_SHADER_TYPES]; /**< array of shader objects. Can be used to print debug info */
+        hash_t      shader_prog_hash;          /**< hash of this shader program. Used to search shader_program
+                                                *   in resource_manager.
+                                                */
+        GLuint      shader_prog_id;            /**<  return ovalue of glCreateProgram().
+                                                *    For more see GLFW documentation.
+                                                */
+        long long   status;                    /**<  Flag for debug info*/
+        
 };
+
+/** Structure to control your resource such as shaders. */
 
 struct resource_manager
 {
-        char*             execute_path;
-        char*             shader_names_chunk;
-        int               shader_names_offset;
-        int               shader_names_size;
+        char*             work_dir;  /**< Save current work directory. This is the path where all resource
+                                      *   will be checked. Note that in function make_shader_prog() all
+                                      *   pathes are relative.
+                                      */
+        char*             shader_names_chunk;  /**< save all relative path to shaders. Used to print debug
+                                                *   info.
+                                                */
+        int               shader_names_offset; /**< offset shader_names_chunk buffer. Used to save relative
+                                                *   path of shaders.
+                                                */
+        int               shader_names_size;  /**<  used to control shader_name_chunk size */
 
         shader_program*   programs;
 

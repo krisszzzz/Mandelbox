@@ -1,7 +1,7 @@
 #include <WinMain.h>
 
-#define WINDOW_WIDTH 1280
-#define WINDOW_HEIGHT 720
+#define WINDOW_WIDTH 1920 
+#define WINDOW_HEIGHT 1080
 
 float x_pos    = 0.17963f;
 float y_pos    = 0.099261f;
@@ -116,13 +116,14 @@ GLFWwindow* make_fullscreen_window()
 
 }
 
-int make_shad_prog_n_res_man(const char *const execution_path, const char *const shader_prog_name)
+int make_shad_prog_n_res_man(const char *const work_dir, const char *const shader_prog_name)
 {
         resource_manager res_man = {};
-        init_resource_manager(&res_man, execution_path);
+        init_resource_manager(&res_man, work_dir);
         bind_resource_manager(res_man);
 
-        create_shader_prog(shader_prog_name, "res/Shaders/vertex_shader.glsl", "res/Shaders/fragment_shader.glsl");
+        create_shader_prog(shader_prog_name, "vertex_shader.glsl",
+                                             "fragment_shader.glsl");
         resource_manager_shader_log();
 
         glfwSetTime(1);

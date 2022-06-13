@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.22 FATAL_ERROR)
 
 
-project(Patch)
+project(Mandelbox)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -23,11 +23,11 @@ include_directories(src/resource-manager/src)
 include_directories(src)
 include_directories(lib/)
 
-add_executable(Patcher src/main.cpp lib/log.cpp src/WinMain.h src/WinMain.cpp src/Patcher/Patcher.cpp)
+add_executable(Mandelbox src/main.cpp lib/log.cpp src/WinMain.h src/WinMain.cpp)
 
-target_link_libraries(Patcher glfw)
-target_link_libraries(Patcher glad)
-target_link_libraries(Patcher resource_manager)
+target_link_libraries(Mandelbox glfw)
+target_link_libraries(Mandelbox glad)
+target_link_libraries(Mandelbox resource_manager)
 
 file(COPY ${CMAKE_SOURCE_DIR}/res DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 #configure_file(src/fragment_shader.txt ${CMAKE_CURRENT_BINARY_DIR}/fragment_shader.txt)
